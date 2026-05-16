@@ -1,13 +1,11 @@
-//
-// Created by dboc9 on 13/05/2026.
-//
-
-#ifndef ROMPEBLOQUES_MENU_H
-#define ROMPEBLOQUES_MENU_H
-
+#ifndef MENU_H
+#define MENU_H
 
 class Menu {
+
+public:
+    void mostrar();
+
 };
 
-
-#endif //ROMPEBLOQUES_MENU_H
+#endif

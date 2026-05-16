@@ -14,11 +14,11 @@ add_executable(RompeBloques
         auth/Login.h
         src/Menu.cpp
         src/Menu.h
-        src/Juego.cpp
-        src/Juego.h
         Api´s/ApiClient.cpp
         Api´s/ApiClient.h
         Api´s/GameApiConfig.h
+        src/RompeBloques.cpp
+        src/RompeBloques.h
 
 )
 

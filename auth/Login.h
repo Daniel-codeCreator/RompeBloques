@@ -26,6 +26,8 @@ public:
     UsuarioApi getUsuarioActual() const;
 
     void cerrarSesion();
+
+    void mostrarLogin();
 };
 
 #endif

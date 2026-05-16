@@ -1,11 +1,14 @@
-#include <iostream>
-#include <string>
+#include "raylib.h"
 
 #include "Api´s/ApiClient.h"
 #include "Api´s/GameApiConfig.h"
 #include "auth/Login.h"
 
 int main() {
+
+    InitWindow(1200, 800, "Proyecto Arcade");
+
+    SetTargetFPS(60);
 
     ApiClient api(
         GameApiConfig::BASE_URL,
@@ -15,28 +18,9 @@ int main() {
 
     Login login(api);
 
-    std::string username;
-    std::string password;
-    std::string error;
+    login.mostrarLogin();
 
-    std::cout << "Usuario: ";
-    std::cin >> username;
-
-    std::cout << "Password: ";
-    std::cin >> password;
-
-    bool ok = login.iniciarSesion(
-        username,
-        password,
-        error
-    );
-
-    if (!ok) {
-        std::cout << "Error Login: " << error << std::endl;
-        return 0;
-    }
-
-    std::cout << "Login exitoso!" << std::endl;
+    CloseWindow();
 
     return 0;
 }
