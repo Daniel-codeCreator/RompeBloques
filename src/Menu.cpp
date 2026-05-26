@@ -2,9 +2,13 @@
 #include "raylib.h"
 #include "RompeBloques.h"
 
+
 void Menu::mostrar() {
 
-    Rectangle botonJugar = { 450, 230, 220, 40 };
+    Rectangle botonJugar  = { 450, 230, 220, 40 };
+    /*
+    Rectangle botonRanking = { 450, 300, 220, 40 };
+    */
 
     while (!WindowShouldClose()) {
 
@@ -13,10 +17,7 @@ void Menu::mostrar() {
         bool click =
             IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 
-        // =========================
-        // CLICK BOTON JUGAR
-        // =========================
-
+        // BOTON JUGAR
         if (click &&
             CheckCollisionPointRec(mouse, botonJugar))
         {
@@ -24,9 +25,6 @@ void Menu::mostrar() {
             break;
         }
 
-        // =========================
-        // DIBUJO
-        // =========================
 
         BeginDrawing();
 
@@ -34,22 +32,33 @@ void Menu::mostrar() {
 
         DrawText(
             "BIENVENIDOS A PROYECTO ARCADE",
-            400,
+            330,
             150,
-            20,
+            30,
             WHITE
         );
 
-        // BOTON
+        // BOTON JUGAR
         DrawRectangleRec(botonJugar, GREEN);
 
         DrawText(
             "Jugar",
-            520,
+            530,
             240,
             20,
             BLACK
         );
+
+        // BOTON RANKING
+        /*DrawRectangleRec(botonRanking, BLUE);
+
+        DrawText(
+            "Consultar Ranking",
+            475,
+            310,
+            20,
+            WHITE
+        );*/
 
         EndDrawing();
     }

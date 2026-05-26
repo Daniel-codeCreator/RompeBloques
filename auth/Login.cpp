@@ -147,7 +147,7 @@ void Login::mostrarLogin() {
         ClearBackground(BLACK);
 
         DrawText(
-            "LOGIN PROYECTO ARCADE",
+            "PROYECTO ARCADE",
             250,
             80,
             40,
