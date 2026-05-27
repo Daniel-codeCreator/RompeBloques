@@ -6,7 +6,7 @@
 
 int main() {
 
-    InitWindow(1920, 1200, "Proyecto Arcade");
+    InitWindow(1920, 1095, "Proyecto Arcade");
 
     SetTargetFPS(60);
 
