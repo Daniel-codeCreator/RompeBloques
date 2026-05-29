@@ -1,7 +1,12 @@
 #include "RompeBloques.h"
 #include "raylib.h"
+#include "../Api´s/ApiClient.h"
+#include "../Api´s/GameApiConfig.h"
 #include <cstdlib>
 #include <ctime>
+#include <chrono>
+#include <string>
+#include <thread>
 
 // ===========================
 // CONSTANTES
@@ -10,28 +15,24 @@
 const int intTiempoPower       = 7;
 const int intTiempoBarraGrande = 4;
 const int filas                = 4;
-const int columnas             = 8;
+const int columnas             = 6;
 const int MAX_NIVELES          = 3;
 
-// Ventana total
 const int ancho                = 1920;
 const int alto                 = 1095;
 
-// Area de juego (panel izquierdo)
 const int juegoX               = 40;
 const int juegoY               = 40;
 const int juegoAncho           = 1400;
 const int juegoAlto            = 1015;
 
-// Panel HUD (panel derecho)
 const int hudX                 = juegoX + juegoAncho + 40;
 const int hudAncho             = ancho - hudX - 20;
 
 const int intBloquesVictoria   = filas * columnas;
 const int MAX_PELOTAS          = 10;
 
-// Velocidad base por nivel
-const float velocidadPorNivel[MAX_NIVELES] = { 4.0f, 6.0f, 9.0f };
+const float velocidadPorNivel[MAX_NIVELES] = { 4.0f, 5.8f, 7.5f };
 
 // ===========================
 // STRUCTS
@@ -42,7 +43,7 @@ struct Bloque
     Rectangle rect;
     bool      activo;
     Color     color;
-    int       vida;      // 1 = normal, 2 = resistente (doble golpe)
+    int       vida;
 };
 
 struct Pelota
@@ -60,6 +61,90 @@ struct PowerUp
     int       tipo;
     bool      activo;
 };
+
+// ===========================
+// FUNCION: calcularTokensPorNivel
+// ===========================
+
+int calcularTokensPorNivel(int nivelCompletado)
+{
+    if (nivelCompletado >= GameApiConfig::SCORE_PREMIO_ALTO)
+        return GameApiConfig::PREMIO_ALTO;
+
+    if (nivelCompletado >= GameApiConfig::SCORE_PREMIO_BAJO)
+        return GameApiConfig::PREMIO_BAJO;
+
+    return 0;
+}
+
+// ===========================
+// FUNCION: iniciarNuevaPartida
+// ===========================
+
+bool iniciarNuevaPartida(ApiClient& api, PartidaApi& partidaActual)
+{
+    std::string error;
+    bool ok = api.iniciarPartida(
+        partidaActual,
+        error,
+        GameApiConfig::VERSION_JUEGO,
+        GameApiConfig::COSTO_PARTIDA
+    );
+    return ok;
+}
+
+// ===========================
+// FUNCION: reportarScoreSiCorresponde
+// ===========================
+
+void reportarScoreSiCorresponde(
+    ApiClient&        api,
+    const PartidaApi& partidaActual,
+    int               scoreActual,
+    int               nivelActual,
+    int&              ultimoScoreReportado)
+{
+    if (scoreActual - ultimoScoreReportado < GameApiConfig::REPORTAR_CADA_PUNTOS)
+        return;
+
+    std::string error;
+    bool ok = api.reportarScore(
+        partidaActual.idPartida,
+        scoreActual,
+        nivelActual,
+        error
+    );
+
+    if (ok)
+        ultimoScoreReportado = scoreActual;
+}
+
+// ===========================
+// FUNCION: finalizarEnHilo
+// Hace la llamada HTTP en segundo plano para no trabar el juego
+// ===========================
+
+void finalizarEnHilo(
+    ApiClient*  api,
+    PartidaApi  partida,
+    int         score,
+    int         nivel,
+    std::string resultado,
+    int         duracion,
+    int         tokens)
+{
+    std::thread([api, partida, score, nivel, resultado, duracion, tokens]() {
+        std::string error;
+        api->finalizarPartida(
+            partida.idPartida,
+            score, nivel,
+            resultado,
+            duracion,
+            tokens,
+            error
+        );
+    }).detach();
+}
 
 // ===========================
 // FUNCION: botonReiniciar
@@ -85,12 +170,98 @@ bool botonReiniciar(int x, int y, int ancho, int alto, const char* texto)
 }
 
 // ===========================
+// FUNCION: dibujarPantallaFinal
+// Retorna: 1 = volver a jugar, 2 = volver al menu, 0 = nada
+// ===========================
+
+int dibujarPantallaFinal(bool gano)
+{
+    int resultado = 0;
+
+    int cx = juegoX + juegoAncho / 2;
+    int cy = juegoY + juegoAlto  / 2;
+
+    // Overlay semitransparente
+    DrawRectangle(juegoX, juegoY, juegoAncho, juegoAlto, { 0, 0, 0, 180 });
+
+    // Cuadro central
+    int cuadroAncho = 500;
+    int cuadroAlto  = 300;
+    int cuadroX     = cx - cuadroAncho / 2;
+    int cuadroY     = cy - cuadroAlto  / 2;
+
+    DrawRectangleRounded(
+        { (float)cuadroX, (float)cuadroY, (float)cuadroAncho, (float)cuadroAlto },
+        0.15f, 8, { 20, 20, 20, 230 });
+
+    Color colorBorde = gano ? GREEN : RED;
+    DrawRectangleRoundedLinesEx(
+        { (float)cuadroX, (float)cuadroY, (float)cuadroAncho, (float)cuadroAlto },
+        0.15f, 8, 3.0f, colorBorde);
+
+    // Titulo
+    const char* titulo    = gano ? "GANASTE!" : "GAME OVER";
+    Color colorTitulo     = gano ? GREEN : RED;
+    int   tamTitulo       = 60;
+    int   anchoTitulo     = MeasureText(titulo, tamTitulo);
+
+    DrawText(titulo, cx - anchoTitulo / 2, cuadroY + 40, tamTitulo, colorTitulo);
+
+    // Linea separadora
+    DrawLine(cuadroX + 30, cuadroY + 120,
+             cuadroX + cuadroAncho - 30, cuadroY + 120,
+             { 80, 80, 80, 255 });
+
+    Vector2 mouse = GetMousePosition();
+
+    // BOTON: Volver a jugar
+    int btnAncho = 200;
+    int btnAlto  = 50;
+    int btn1X    = cx - btnAncho - 20;
+    int btn1Y    = cuadroY + 160;
+
+    Rectangle boton1 = { (float)btn1X, (float)btn1Y, (float)btnAncho, (float)btnAlto };
+    bool hover1      = CheckCollisionPointRec(mouse, boton1);
+
+    Color colorBtn1 = hover1 ? GREEN : Color{ 0, 150, 0, 255 };
+    DrawRectangleRounded(boton1, 0.3f, 6, colorBtn1);
+    DrawRectangleRoundedLinesEx(boton1, 0.3f, 6, 2.0f, WHITE);
+
+    const char* txtBtn1   = "Volver a jugar";
+    int         anchoBtn1 = MeasureText(txtBtn1, 18);
+    DrawText(txtBtn1, btn1X + (btnAncho - anchoBtn1) / 2, btn1Y + 16, 18, WHITE);
+
+    if (hover1 && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        resultado = 1;
+
+    // BOTON: Volver al menu
+    int btn2X = cx + 20;
+    int btn2Y = cuadroY + 160;
+
+    Rectangle boton2 = { (float)btn2X, (float)btn2Y, (float)btnAncho, (float)btnAlto };
+    bool hover2      = CheckCollisionPointRec(mouse, boton2);
+
+    Color colorBtn2 = hover2 ? SKYBLUE : Color{ 0, 100, 180, 255 };
+    DrawRectangleRounded(boton2, 0.3f, 6, colorBtn2);
+    DrawRectangleRoundedLinesEx(boton2, 0.3f, 6, 2.0f, WHITE);
+
+    const char* txtBtn2   = "Volver al Menu";
+    int         anchoBtn2 = MeasureText(txtBtn2, 18);
+    DrawText(txtBtn2, btn2X + (btnAncho - anchoBtn2) / 2, btn2Y + 16, 18, WHITE);
+
+    if (hover2 && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        resultado = 2;
+
+    return resultado;
+}
+
+// ===========================
 // FUNCION: moverBarra
 // ===========================
 
 void moverBarra(Rectangle& barra)
 {
-    if (IsKeyDown(KEY_LEFT)  || IsKeyDown(KEY_A))
+    if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))
         barra.x -= 7.0f;
 
     if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
@@ -116,50 +287,30 @@ void dibujarAreaJuego()
         3, DARKGRAY);
 }
 
-// ===========================
-// FUNCION: dibujarBarra
-// ===========================
-
 void dibujarBarra(Rectangle barra)
 {
     DrawRectangleRec(barra, WHITE);
 }
 
-// ===========================
-// FUNCION: dibujarPelotas
-// ===========================
-
 void dibujarPelotas(Pelota pelotas[], int maxPelotas)
 {
     for (int p = 0; p < maxPelotas; p++)
-    {
         if (pelotas[p].activa)
         {
             Color color = pelotas[p].bomba ? RED : SKYBLUE;
             DrawCircleV(pelotas[p].pos, pelotas[p].radio, color);
         }
-    }
 }
-
-// ===========================
-// FUNCION: dibujarBloques
-// Bloques con esquinas redondeadas, borde oscuro
-// y grieta si vida == 1 (ya recibio un golpe)
-// ===========================
 
 void dibujarBloques(Bloque bloques[filas][columnas])
 {
     for (int i = 0; i < filas; i++)
-    {
         for (int j = 0; j < columnas; j++)
         {
-            if (!bloques[i][j].activo)
-                continue;
+            if (!bloques[i][j].activo) continue;
 
             Rectangle r = bloques[i][j].rect;
             Color c     = bloques[i][j].color;
-
-            // Sombra / borde oscuro
             Color borde = { (unsigned char)(c.r / 2),
                             (unsigned char)(c.g / 2),
                             (unsigned char)(c.b / 2), 255 };
@@ -167,28 +318,20 @@ void dibujarBloques(Bloque bloques[filas][columnas])
             DrawRectangleRounded(r, 0.3f, 6, c);
             DrawRectangleRoundedLinesEx(r, 0.3f, 6, 3.0f, borde);
 
-            // Si el bloque resistente ya recibio un golpe (vida == 1), dibujar grieta
             if (bloques[i][j].vida == 1)
             {
-                // Linea diagonal simulando grieta
                 int cx = (int)(r.x + r.width  / 2);
                 int cy = (int)(r.y + r.height / 2);
-                DrawLine(cx - 8, cy - 6, cx + 4, cy + 8, BLACK);
+                DrawLine(cx - 8, cy - 6, cx + 4, cy + 8,  BLACK);
                 DrawLine(cx + 4, cy + 8, cx - 2, cy + 14, BLACK);
                 DrawLine(cx - 8, cy - 6, cx - 2, cy - 14, BLACK);
             }
         }
-    }
 }
-
-// ===========================
-// FUNCION: dibujarPowerUp
-// ===========================
 
 void dibujarPowerUp(PowerUp power)
 {
-    if (!power.activo)
-        return;
+    if (!power.activo) return;
 
     Color c = YELLOW;
     if (power.tipo == 1) c = GREEN;
@@ -197,10 +340,6 @@ void dibujarPowerUp(PowerUp power)
 
     DrawRectangleRec(power.rect, c);
 }
-
-// ===========================
-// FUNCION: dibujarHUD
-// ===========================
 
 void dibujarHUD(int puntos, int vidas, int nivel)
 {
@@ -226,50 +365,31 @@ void dibujarHUD(int puntos, int vidas, int nivel)
 void aplicarPowerBolaExtra(Pelota pelotas[], int maxPelotas, Rectangle barra)
 {
     for (int i = 0; i < maxPelotas; i++)
-    {
         if (!pelotas[i].activa)
         {
-            pelotas[i] = {
-                { barra.x + barra.width / 2, barra.y - 10 },
-                { -4.0f, -4.0f },
-                8.0f, true, false
-            };
+            pelotas[i] = {{ barra.x + barra.width / 2, barra.y - 10 },
+                          { -4.0f, -4.0f }, 8.0f, true, false};
             break;
         }
-    }
 }
 
 void aplicarPowerDobleBola(Pelota pelotas[], int maxPelotas, Rectangle barra)
 {
     for (int k = 0; k < 2; k++)
-    {
         for (int i = 0; i < maxPelotas; i++)
-        {
             if (!pelotas[i].activa)
             {
-                float velocidadX = (float)((rand() % 5) - 2);
-                if (velocidadX == 0) velocidadX = 2.0f;
-
-                pelotas[i] = {
-                    { barra.x + barra.width / 2, barra.y - 10 },
-                    { velocidadX, -4.0f },
-                    8.0f, true, false
-                };
+                float vx = (float)((rand() % 5) - 2);
+                if (vx == 0) vx = 2.0f;
+                pelotas[i] = {{ barra.x + barra.width / 2, barra.y - 10 },
+                               { vx, -4.0f }, 8.0f, true, false};
                 break;
             }
-        }
-    }
 }
 
-void aplicarPowerBomba(Pelota pelotas[])
-{
-    pelotas[0].bomba = true;
-}
+void aplicarPowerBomba(Pelota pelotas[]) { pelotas[0].bomba = true; }
 
-void aplicarPowerBarraGrande(
-    Rectangle& barra,
-    bool&      barraGrandeActiva,
-    double&    tiempoBarraGrande)
+void aplicarPowerBarraGrande(Rectangle& barra, bool& barraGrandeActiva, double& tiempoBarraGrande)
 {
     barra.width       = 220.0f;
     barraGrandeActiva = true;
@@ -277,13 +397,8 @@ void aplicarPowerBarraGrande(
 }
 
 void actualizarPowerUp(
-    PowerUp&   power,
-    Rectangle& barra,
-    Pelota     pelotas[],
-    int        maxPelotas,
-    bool&      barraGrandeActiva,
-    double&    tiempoBarraGrande,
-    double&    ultimoPower)
+    PowerUp& power, Rectangle& barra, Pelota pelotas[], int maxPelotas,
+    bool& barraGrandeActiva, double& tiempoBarraGrande, double& ultimoPower)
 {
     if (GetTime() - ultimoPower > intTiempoPower)
     {
@@ -294,11 +409,9 @@ void actualizarPowerUp(
         ultimoPower  = GetTime();
     }
 
-    if (power.activo)
-        power.rect.y += 2.0f;
+    if (power.activo) power.rect.y += 2.0f;
 
-    if (barraGrandeActiva &&
-        GetTime() - tiempoBarraGrande > intTiempoBarraGrande)
+    if (barraGrandeActiva && GetTime() - tiempoBarraGrande > intTiempoBarraGrande)
     {
         barra.width       = 140.0f;
         barraGrandeActiva = false;
@@ -310,57 +423,40 @@ void actualizarPowerUp(
         if (power.tipo == 1) aplicarPowerDobleBola(pelotas, maxPelotas, barra);
         if (power.tipo == 2) aplicarPowerBomba(pelotas);
         if (power.tipo == 3) aplicarPowerBarraGrande(barra, barraGrandeActiva, tiempoBarraGrande);
-
         power.activo = false;
     }
 }
 
 // ===========================
 // FUNCION: cargarNivel
-// Nivel 1: todos normales (vida 1)
-// Nivel 2: mitad resistentes (vida 2)
-// Nivel 3: todos resistentes (vida 2)
 // ===========================
 
-void cargarNivel(
-    Bloque bloques[filas][columnas],
-    Color  colores[],
-    int    nivel)
+void cargarNivel(Bloque bloques[filas][columnas], Color colores[], int nivel)
 {
     const float intAnchoBloques = 160.0f;
-    const float intAltoBloques  = 50.0f;
+    const float intAltoBloques  = 80.0f;
     const float espacioH        = 10.0f;
     const float espacioV        = 10.0f;
 
-    // Centrar los bloques horizontalmente en el area de juego
     float totalAncho = columnas * intAnchoBloques + (columnas - 1) * espacioH;
     float margenIzq  = juegoX + (juegoAncho - totalAncho) / 2.0f;
     float margenTop  = juegoY + 60.0f;
 
     for (int i = 0; i < filas; i++)
-    {
         for (int j = 0; j < columnas; j++)
         {
             bloques[i][j].rect = {
                 margenIzq + j * (intAnchoBloques + espacioH),
                 margenTop + i * (intAltoBloques  + espacioV),
-                intAnchoBloques,
-                intAltoBloques
+                intAnchoBloques, intAltoBloques
             };
             bloques[i][j].activo = true;
             bloques[i][j].color  = colores[rand() % 6];
 
-            // Nivel 1: todos vida 1
-            // Nivel 2: filas pares resistentes (vida 2)
-            // Nivel 3: todos resistentes (vida 2)
-            if (nivel == 1)
-                bloques[i][j].vida = 1;
-            else if (nivel == 2)
-                bloques[i][j].vida = (i % 2 == 0) ? 2 : 1;
-            else
-                bloques[i][j].vida = 2;
+            if (nivel == 1)      bloques[i][j].vida = 1;
+            else if (nivel == 2) bloques[i][j].vida = (i % 2 == 0) ? 2 : 1;
+            else                 bloques[i][j].vida = 2;
         }
-    }
 }
 
 // ===========================
@@ -368,19 +464,14 @@ void cargarNivel(
 // ===========================
 
 void moverPelotas(
-    Pelota    pelotas[],
-    int       maxPelotas,
-    Rectangle barra,
-    Bloque    bloques[filas][columnas],
-    int&      puntos,
-    int&      bloquesDestruidos,
-    float&    velocidadActual,
-    bool      romperBloques)
+    Pelota pelotas[], int maxPelotas, Rectangle barra,
+    Bloque bloques[filas][columnas],
+    int& puntos, int& bloquesDestruidos,
+    float& velocidadActual, bool romperBloques)
 {
     for (int p = 0; p < maxPelotas; p++)
     {
-        if (!pelotas[p].activa)
-            continue;
+        if (!pelotas[p].activa) continue;
 
         pelotas[p].pos.x += pelotas[p].vel.x;
         pelotas[p].pos.y += pelotas[p].vel.y;
@@ -407,19 +498,14 @@ void moverPelotas(
         if (romperBloques)
         {
             for (int i = 0; i < filas; i++)
-            {
                 for (int j = 0; j < columnas; j++)
                 {
-                    if (!bloques[i][j].activo)
-                        continue;
+                    if (!bloques[i][j].activo) continue;
 
                     if (CheckCollisionCircleRec(
-                            pelotas[p].pos,
-                            pelotas[p].radio,
-                            bloques[i][j].rect))
+                            pelotas[p].pos, pelotas[p].radio, bloques[i][j].rect))
                     {
                         pelotas[p].vel.y *= -1;
-
                         bloques[i][j].vida--;
 
                         if (bloques[i][j].vida <= 0)
@@ -428,7 +514,7 @@ void moverPelotas(
                             puntos++;
                             bloquesDestruidos++;
 
-                            // Aumentar velocidad cada 15 bloques destruidos
+                            //aumenta la velocidad segun los bloques destruidos
                             const int intPelotasDestruidos = 15;
                             if (bloquesDestruidos > 0 &&
                                 bloquesDestruidos % intPelotasDestruidos == 0)
@@ -439,147 +525,77 @@ void moverPelotas(
                             }
                         }
 
-                        // Efecto bomba: destruye adyacentes ignorando vida
                         if (pelotas[p].bomba)
                         {
                             for (int a = -1; a <= 1; a++)
-                            {
                                 for (int b = -1; b <= 1; b++)
                                 {
-                                    int ni = i + a;
-                                    int nj = j + b;
-
-                                    if (ni >= 0 && ni < filas &&
-                                        nj >= 0 && nj < columnas)
-                                    {
+                                    int ni = i + a, nj = j + b;
+                                    if (ni >= 0 && ni < filas && nj >= 0 && nj < columnas)
                                         if (bloques[ni][nj].activo)
                                         {
                                             bloques[ni][nj].activo = false;
                                             puntos++;
                                             bloquesDestruidos++;
                                         }
-                                    }
                                 }
-                            }
                             pelotas[p].bomba = false;
                         }
-
                         break;
                     }
                 }
-            }
         }
         else
         {
             for (int i = 0; i < filas; i++)
-            {
                 for (int j = 0; j < columnas; j++)
                 {
-                    if (!bloques[i][j].activo)
-                        continue;
-
+                    if (!bloques[i][j].activo) continue;
                     if (CheckCollisionCircleRec(
-                            pelotas[p].pos,
-                            pelotas[p].radio,
-                            bloques[i][j].rect))
+                            pelotas[p].pos, pelotas[p].radio, bloques[i][j].rect))
                     {
                         pelotas[p].vel.y *= -1;
                         break;
                     }
                 }
-            }
         }
     }
 }
 
 // ===========================
-// FUNCION: reiniciarJuego
+// FUNCION: resetearPelotaYBarra
 // ===========================
 
-void reiniciarJuego(
-    Rectangle& barra,
-    Pelota     pelotas[],
-    int        maxPelotas,
-    Bloque     bloques[filas][columnas],
-    Color      colores[],
-    int&       puntos,
-    int&       vidas,
-    int&       bloquesDestruidos,
-    bool&      ganar,
-    bool&      perder,
-    bool&      esperandoLanzar,
-    PowerUp&   power,
-    bool&      barraGrandeActiva,
-    float&     velocidadActual,
-    bool&      sonidoGanadoReproducido,
-    bool&      sonidoPerdidoReproducido,
-    int&       nivel)
+void resetearPelotaYBarra(Rectangle& barra, Pelota pelotas[], int maxPelotas,
+                           bool& esperandoLanzar)
 {
-    nivel           = 1;
-    velocidadActual = velocidadPorNivel[0];
-    barra           = { (float)(juegoX + juegoAncho / 2 - 70),
-                        (float)(juegoY + juegoAlto - 150), 140.0f, 20.0f };
-
     for (int i = 0; i < maxPelotas; i++)
         pelotas[i].activa = false;
 
     pelotas[0] = {
         { barra.x + barra.width / 2, barra.y - 10 },
-        { 0.0f, 0.0f },
-        8.0f, true, false
+        { 0.0f, 0.0f }, 8.0f, true, false
     };
-
     esperandoLanzar = true;
-
-    cargarNivel(bloques, colores, nivel);
-
-    puntos            = 0;
-    vidas             = 3;
-    bloquesDestruidos = 0;
-    ganar             = false;
-    perder            = false;
-    power.activo      = false;
-    barraGrandeActiva = false;
-
-    sonidoGanadoReproducido  = false;
-    sonidoPerdidoReproducido = false;
 }
 
 // ===========================
 // FUNCION: subirNivel
-// Se llama cuando se destruyen todos los bloques
 // ===========================
 
 void subirNivel(
-    Rectangle& barra,
-    Pelota     pelotas[],
-    int        maxPelotas,
-    Bloque     bloques[filas][columnas],
-    Color      colores[],
-    int&       bloquesDestruidos,
-    bool&      esperandoLanzar,
-    PowerUp&   power,
-    bool&      barraGrandeActiva,
-    float&     velocidadActual,
-    int&       nivel)
+    Rectangle& barra, Pelota pelotas[], int maxPelotas,
+    Bloque bloques[filas][columnas], Color colores[],
+    int& bloquesDestruidos, bool& esperandoLanzar,
+    PowerUp& power, bool& barraGrandeActiva,
+    float& velocidadActual, int& nivel)
 {
     nivel++;
     bloquesDestruidos = 0;
+    velocidadActual   = velocidadPorNivel[nivel - 1];
 
-    // Velocidad base del nuevo nivel
-    velocidadActual = velocidadPorNivel[nivel - 1];
+    resetearPelotaYBarra(barra, pelotas, maxPelotas, esperandoLanzar);
 
-    // Resetear pelota
-    for (int i = 0; i < maxPelotas; i++)
-        pelotas[i].activa = false;
-
-    pelotas[0] = {
-        { barra.x + barra.width / 2, barra.y - 10 },
-        { 0.0f, 0.0f },
-        8.0f, true, false
-    };
-
-    esperandoLanzar   = true;
     power.activo      = false;
     barraGrandeActiva = false;
     barra.width       = 140.0f;
@@ -588,35 +604,66 @@ void subirNivel(
 }
 
 // ===========================
-// FUNCION PRINCIPAL
+// FUNCION: reiniciarJuego
 // ===========================
 
-void iniciarRompeBloque()
+void reiniciarJuego(
+    Rectangle& barra, Pelota pelotas[], int maxPelotas,
+    Bloque bloques[filas][columnas], Color colores[],
+    int& puntos, int& vidas, int& bloquesDestruidos,
+    bool& ganar, bool& perder, bool& esperandoLanzar,
+    PowerUp& power, bool& barraGrandeActiva,
+    float& velocidadActual,
+    bool& sonidoGanadoReproducido, bool& sonidoPerdidoReproducido,
+    int& nivel, bool& partidaFinalizada, int& ultimoScoreReportado)
+{
+    nivel           = 1;
+    velocidadActual = velocidadPorNivel[0];
+    barra           = { (float)(juegoX + juegoAncho / 2 - 70),
+                        (float)(juegoY + juegoAlto - 150), 140.0f, 20.0f };
+
+    resetearPelotaYBarra(barra, pelotas, maxPelotas, esperandoLanzar);
+    cargarNivel(bloques, colores, nivel);
+
+    puntos               = 0;
+    vidas                = 3;
+    bloquesDestruidos    = 0;
+    ganar                = false;
+    perder               = false;
+    power.activo         = false;
+    barraGrandeActiva    = false;
+    partidaFinalizada    = false;
+    ultimoScoreReportado = 0;
+    sonidoGanadoReproducido  = false;
+    sonidoPerdidoReproducido = false;
+}
+
+// ===========================
+// FUNCION PRINCIPAL
+// Retorna true si el jugador presiono "Volver al Menu"
+// Retorna false si cerro la ventana
+// ===========================
+
+bool iniciarRompeBloque(ApiClient& api)
 {
     InitAudioDevice();
     SetTargetFPS(60);
     srand(time(NULL));
 
     Color colores[] = { RED, ORANGE, YELLOW, GREEN, BLUE, PURPLE };
-
     int nivel = 1;
 
     Rectangle barra = {
         (float)(juegoX + juegoAncho / 2 - 70),
         (float)(juegoY + juegoAlto - 150),
-        140.0f,
-        20.0f
+        140.0f, 20.0f
     };
 
     Pelota pelotas[MAX_PELOTAS];
-    for (int i = 0; i < MAX_PELOTAS; i++)
-        pelotas[i].activa = false;
+    for (int i = 0; i < MAX_PELOTAS; i++) pelotas[i].activa = false;
 
-    pelotas[0] = {
-        { barra.x + barra.width / 2, barra.y - 10 },
-        { 0.0f, 0.0f },
-        8.0f, true, false
-    };
+    pelotas[0] = {{ barra.x + barra.width / 2, barra.y - 10 },
+                  { 0.0f, 0.0f }, 8.0f, true, false};
 
     bool  esperandoLanzar = true;
     float velocidadActual = velocidadPorNivel[0];
@@ -625,25 +672,27 @@ void iniciarRompeBloque()
     Bloque bloques[filas][columnas];
     cargarNivel(bloques, colores, nivel);
 
-    int puntos            = 0;
-    int vidas             = 3;
-    int bloquesDestruidos = 0;
-
-    bool ganar  = false;
-    bool perder = false;
+    int puntos = 0, vidas = 3, bloquesDestruidos = 0;
+    bool ganar = false, perder = false;
 
     PowerUp power  = {};
-    power.activo   = false;
     double ultimoPower = GetTime();
-
     bool   barraGrandeActiva = false;
     double tiempoBarraGrande = 0;
 
     Sound sonidoGanador  = LoadSound("../assets/Sonidodeganador.mp3");
     Sound sonidoPerdedor = LoadSound("../assets/JIJIJIJA.mp3");
-
     bool sonidoGanadoReproducido  = false;
     bool sonidoPerdidoReproducido = false;
+
+    // API
+    PartidaApi partidaActual;
+    bool partidaIniciada      = false;
+    bool partidaFinalizada    = false;
+    int  ultimoScoreReportado = 0;
+    std::chrono::steady_clock::time_point inicioPartida;
+
+    bool volverAlMenu = false;
 
     while (!WindowShouldClose())
     {
@@ -660,28 +709,42 @@ void iniciarRompeBloque()
                 pelotas[0].pos.x = barra.x + barra.width / 2;
                 pelotas[0].pos.y = barra.y - pelotas[0].radio;
 
+                bool  lanzar = false;
+                float dirX   = velocidadActual;
+
+                //lanza la pelota
                 if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A))
-                {
-                    pelotas[0].vel  = { -velocidadActual, -velocidadActual };
-                    esperandoLanzar = false;
-                }
+                    { lanzar = true; dirX = -velocidadActual; }
                 else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
+                    { lanzar = true; dirX =  velocidadActual; }
+                else if (IsKeyPressed(KEY_W))
+                    { lanzar = true; dirX = (rand() % 2 == 0) ? velocidadActual : -velocidadActual; }
+
+                if (lanzar)
                 {
-                    pelotas[0].vel  = { velocidadActual, -velocidadActual };
+                    pelotas[0].vel  = { dirX, -velocidadActual };
                     esperandoLanzar = false;
+
+                    if (!partidaIniciada)
+                    {
+                        inicioPartida   = std::chrono::steady_clock::now();
+                        partidaIniciada = iniciarNuevaPartida(api, partidaActual);
+                    }
                 }
             }
 
-            actualizarPowerUp(
-                power, barra, pelotas, MAX_PELOTAS,
-                barraGrandeActiva, tiempoBarraGrande, ultimoPower);
+            actualizarPowerUp(power, barra, pelotas, MAX_PELOTAS,
+                              barraGrandeActiva, tiempoBarraGrande, ultimoPower);
 
             if (!esperandoLanzar)
-                moverPelotas(pelotas, MAX_PELOTAS, barra,
-                             bloques, puntos, bloquesDestruidos,
-                             velocidadActual, romperBloques);
+                moverPelotas(pelotas, MAX_PELOTAS, barra, bloques,
+                             puntos, bloquesDestruidos, velocidadActual, romperBloques);
 
-            // Verificar si todas las pelotas cayeron
+            if (partidaIniciada)
+                reportarScoreSiCorresponde(api, partidaActual,
+                                           puntos, nivel, ultimoScoreReportado);
+
+            // Verificar pelotas caidas
             bool algunaPelotaActiva = false;
             for (int i = 0; i < MAX_PELOTAS; i++)
                 if (pelotas[i].activa) { algunaPelotaActiva = true; break; }
@@ -689,36 +752,53 @@ void iniciarRompeBloque()
             if (!algunaPelotaActiva)
             {
                 vidas--;
-
                 if (vidas <= 0)
-                {
                     perder = true;
-                }
                 else
-                {
-                    pelotas[0] = {
-                        { barra.x + barra.width / 2, barra.y - 10 },
-                        { 0.0f, 0.0f },
-                        8.0f, true, false
-                    };
-                    esperandoLanzar = true;
-                }
+                    resetearPelotaYBarra(barra, pelotas, MAX_PELOTAS, esperandoLanzar);
             }
 
-            // Verificar si se destruyeron todos los bloques del nivel
+            // Verificar nivel completado
             if (bloquesDestruidos >= intBloquesVictoria)
             {
                 if (nivel >= MAX_NIVELES)
                 {
-                    ganar = true;   // gano todos los niveles
+                    ganar = true;
                 }
                 else
                 {
-                    subirNivel(
-                        barra, pelotas, MAX_PELOTAS, bloques, colores,
-                        bloquesDestruidos, esperandoLanzar,
-                        power, barraGrandeActiva, velocidadActual, nivel);
+                    if (partidaIniciada && !partidaFinalizada && nivel == 2)
+                    {
+                        auto ahora   = std::chrono::steady_clock::now();
+                        int duracion = (int)std::chrono::duration_cast<
+                            std::chrono::seconds>(ahora - inicioPartida).count();
+
+                        int tokens = calcularTokensPorNivel(nivel);
+
+                        finalizarEnHilo(&api, partidaActual,
+                                        puntos, nivel, "WIN", duracion, tokens);
+
+                        inicioPartida        = std::chrono::steady_clock::now();
+                        ultimoScoreReportado = 0;
+                        partidaIniciada      = iniciarNuevaPartida(api, partidaActual);
+                    }
+
+                    subirNivel(barra, pelotas, MAX_PELOTAS, bloques, colores,
+                               bloquesDestruidos, esperandoLanzar,
+                               power, barraGrandeActiva, velocidadActual, nivel);
                 }
+            }
+
+            // Perder: finalizar en hilo
+            if (perder && partidaIniciada && !partidaFinalizada)
+            {
+                auto ahora   = std::chrono::steady_clock::now();
+                int duracion = (int)std::chrono::duration_cast<
+                    std::chrono::seconds>(ahora - inicioPartida).count();
+
+                finalizarEnHilo(&api, partidaActual,
+                                puntos, nivel, "LOSE", duracion, 0);
+                partidaFinalizada = true;
             }
         }
 
@@ -739,28 +819,41 @@ void iniciarRompeBloque()
         // PANTALLA GANAR
         if (ganar)
         {
+            if (partidaIniciada && !partidaFinalizada)
+            {
+                auto ahora   = std::chrono::steady_clock::now();
+                int duracion = (int)std::chrono::duration_cast<
+                    std::chrono::seconds>(ahora - inicioPartida).count();
+
+                int tokens = calcularTokensPorNivel(MAX_NIVELES);
+                finalizarEnHilo(&api, partidaActual,
+                                puntos, nivel, "WIN", duracion, tokens);
+                partidaFinalizada = true;
+            }
+
             if (!sonidoGanadoReproducido)
             {
                 PlaySound(sonidoGanador);
                 sonidoGanadoReproducido = true;
             }
 
-            DrawText("GANASTE!",
-                juegoX + juegoAncho / 2 - 130,
-                juegoY + juegoAlto  / 2 - 50,
-                60, GREEN);
+            int accion = dibujarPantallaFinal(true);
 
-            if (botonReiniciar(
-                    juegoX + juegoAncho / 2 - 110,
-                    juegoY + juegoAlto  / 2 + 30,
-                    220, 60, "Volver a jugar"))
-                reiniciarJuego(
-                    barra, pelotas, MAX_PELOTAS, bloques, colores,
-                    puntos, vidas, bloquesDestruidos,
-                    ganar, perder, esperandoLanzar,
-                    power, barraGrandeActiva, velocidadActual,
-                    sonidoGanadoReproducido, sonidoPerdidoReproducido,
-                    nivel);
+            if (accion == 1)
+            {
+                reiniciarJuego(barra, pelotas, MAX_PELOTAS, bloques, colores,
+                               puntos, vidas, bloquesDestruidos,
+                               ganar, perder, esperandoLanzar,
+                               power, barraGrandeActiva, velocidadActual,
+                               sonidoGanadoReproducido, sonidoPerdidoReproducido,
+                               nivel, partidaFinalizada, ultimoScoreReportado);
+                partidaIniciada = false;
+            }
+            else if (accion == 2)
+            {
+                volverAlMenu = true;
+                break;
+            }
         }
 
         // PANTALLA PERDER
@@ -772,22 +865,23 @@ void iniciarRompeBloque()
                 sonidoPerdidoReproducido = true;
             }
 
-            DrawText("GAME OVER",
-                juegoX + juegoAncho / 2 - 150,
-                juegoY + juegoAlto  / 2 - 50,
-                60, RED);
+            int accion = dibujarPantallaFinal(false);
 
-            if (botonReiniciar(
-                    juegoX + juegoAncho / 2 - 110,
-                    juegoY + juegoAlto  / 2 + 30,
-                    220, 60, "Volver a jugar"))
-                reiniciarJuego(
-                    barra, pelotas, MAX_PELOTAS, bloques, colores,
-                    puntos, vidas, bloquesDestruidos,
-                    ganar, perder, esperandoLanzar,
-                    power, barraGrandeActiva, velocidadActual,
-                    sonidoGanadoReproducido, sonidoPerdidoReproducido,
-                    nivel);
+            if (accion == 1)
+            {
+                reiniciarJuego(barra, pelotas, MAX_PELOTAS, bloques, colores,
+                               puntos, vidas, bloquesDestruidos,
+                               ganar, perder, esperandoLanzar,
+                               power, barraGrandeActiva, velocidadActual,
+                               sonidoGanadoReproducido, sonidoPerdidoReproducido,
+                               nivel, partidaFinalizada, ultimoScoreReportado);
+                partidaIniciada = false;
+            }
+            else if (accion == 2)
+            {
+                volverAlMenu = true;
+                break;
+            }
         }
 
         EndDrawing();
@@ -796,4 +890,6 @@ void iniciarRompeBloque()
     UnloadSound(sonidoGanador);
     UnloadSound(sonidoPerdedor);
     CloseAudioDevice();
+
+    return volverAlMenu;
 }

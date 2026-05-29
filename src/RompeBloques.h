@@ -1,12 +1,8 @@
-//
-// Created by dboc9 on 16/05/2026.
-//
 
 #ifndef ROMPEBLOQUES_ROMPEBLOQUES_H
 #define ROMPEBLOQUES_ROMPEBLOQUES_H
 
-
-void iniciarRompeBloque();
-
+#include "../Api´s/ApiClient.h"
+bool iniciarRompeBloque(ApiClient& api);
 
 #endif //ROMPEBLOQUES_ROMPEBLOQUES_H

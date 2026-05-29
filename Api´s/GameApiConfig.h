@@ -38,16 +38,16 @@ namespace GameApiConfig { // Agrupa toda la configuración del juego en un solo 
     // REGLAS DE PREMIOS
     // =========================
 
-    const int SCORE_PREMIO_BAJO = 50; 
+    const int SCORE_PREMIO_BAJO = 2;
     // Puntaje mínimo para que el usuario gane el premio bajo.
 
-    const int SCORE_PREMIO_ALTO = 100; 
+    const int SCORE_PREMIO_ALTO = 3;
     // Puntaje mínimo para que el usuario gane el premio alto.
 
     const int PREMIO_BAJO = 10; 
     // Tokens que gana el usuario si alcanza SCORE_PREMIO_BAJO.
 
-    const int PREMIO_ALTO = 30; 
+    const int PREMIO_ALTO = 25;
     // Tokens que gana el usuario si alcanza SCORE_PREMIO_ALTO.
 
     // =========================

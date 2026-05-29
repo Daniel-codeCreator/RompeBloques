@@ -62,13 +62,43 @@ void Login::mostrarLogin() {
 
     bool mostrarPassword = false;
 
+    int screenWidth  = 1920;
+    int screenHeight = 1095;
+
+    int centroX = screenWidth / 2;
+
+    int inputWidth  = 350;
+    int inputHeight = 50;
+
     // INPUTS
-    Rectangle inputUsuario  = { 220, 180, 350, 50 };
-    Rectangle inputPassword = { 220, 300, 350, 50 };
+    Rectangle inputUsuario = {
+        (float)(centroX - inputWidth / 2),
+        180,
+        (float)inputWidth,
+        (float)inputHeight
+    };
+
+    Rectangle inputPassword = {
+        (float)(centroX - inputWidth / 2),
+        300,
+        (float)inputWidth,
+        (float)inputHeight
+    };
 
     // BOTONES
-    Rectangle botonLogin = { 320, 430, 120, 40 };
-    Rectangle botonOjo   = { 580, 300, 40, 50 };
+    Rectangle botonLogin = {
+        (float)(centroX - 60),
+        430,
+        120,
+        40
+    };
+
+    Rectangle botonOjo = {
+        inputPassword.x + inputPassword.width + 10,
+        inputPassword.y,
+        40,
+        50
+    };
 
     std::string username = "";
     std::string password = "";
@@ -101,7 +131,8 @@ void Login::mostrarLogin() {
 
                 if (escribiendoUsuario) {
                     username += (char)key;
-                } else {
+                }
+                else {
                     password += (char)key;
                 }
             }
@@ -136,7 +167,7 @@ void Login::mostrarLogin() {
             bool ok = iniciarSesion(username, password, mensajeError);
 
             if (ok) {
-                Menu menu;
+                Menu menu(api);
                 menu.mostrar();
                 break;
             }
@@ -146,11 +177,17 @@ void Login::mostrarLogin() {
 
         ClearBackground(BLACK);
 
+        // TITULO CENTRADO
+        const char* titulo = "PROYECTO ARCADE";
+        int tituloSize = 40;
+
+        int tituloWidth = MeasureText(titulo, tituloSize);
+
         DrawText(
-            "PROYECTO ARCADE",
-            250,
+            titulo,
+            centroX - tituloWidth / 2,
             80,
-            40,
+            tituloSize,
             WHITE
         );
 
@@ -162,16 +199,16 @@ void Login::mostrarLogin() {
 
         DrawText(
             username.c_str(),
-            230,
-            195,
+            inputUsuario.x + 10,
+            inputUsuario.y + 15,
             25,
             WHITE
         );
 
         DrawText(
             "USUARIO",
-            220,
-            150,
+            inputUsuario.x,
+            inputUsuario.y - 30,
             20,
             LIGHTGRAY
         );
@@ -188,16 +225,16 @@ void Login::mostrarLogin() {
 
         DrawText(
             passToShow.c_str(),
-            230,
-            315,
+            inputPassword.x + 10,
+            inputPassword.y + 15,
             25,
             WHITE
         );
 
         DrawText(
             "PASSWORD",
-            220,
-            270,
+            inputPassword.x,
+            inputPassword.y - 30,
             20,
             LIGHTGRAY
         );
@@ -207,8 +244,8 @@ void Login::mostrarLogin() {
 
         DrawText(
             "O",
-            592,
-            310,
+            botonOjo.x + 12,
+            botonOjo.y + 10,
             30,
             WHITE
         );
@@ -218,16 +255,20 @@ void Login::mostrarLogin() {
 
         DrawText(
             "LOGIN",
-            345,
-            440,
+            botonLogin.x + 25,
+            botonLogin.y + 10,
             20,
             BLACK
         );
 
         // TEXTO INFO
+        const char* info = "Click o TAB para cambiar campo";
+
+        int infoWidth = MeasureText(info, 20);
+
         DrawText(
-            "Click o TAB para cambiar campo",
-            220,
+            info,
+            centroX - infoWidth / 2,
             390,
             20,
             LIGHTGRAY
@@ -236,9 +277,14 @@ void Login::mostrarLogin() {
         // ERROR
         if (!mensajeError.empty()) {
 
+            int errorWidth = MeasureText(
+                mensajeError.c_str(),
+                20
+            );
+
             DrawText(
                 mensajeError.c_str(),
-                180,
+                centroX - errorWidth / 2,
                 500,
                 20,
                 RED
