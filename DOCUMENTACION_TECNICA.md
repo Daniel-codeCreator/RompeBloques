@@ -1,87 +1,55 @@
 # Documentación Técnica - Proyecto Arcade (Rompe Bloques)
 
-Este documento detalla la estructura y el funcionamiento del código del "Proyecto Arcade", específicamente el juego "Rompe Bloques". El proyecto está desarrollado en C++ utilizando la biblioteca **Raylib** para la interfaz gráfica y **CPR** para el consumo de una API REST.
+Este documento detalla la estructura y el funcionamiento del código para los archivos principales del juego.
 
 ---
 
-## 1. Punto de Entrada (`main.cpp`)
-
-Es el archivo principal que orquesta la ejecución del programa.
-- **`main()`**:
-  - Inicializa la ventana de Raylib (`InitWindow`).
-  - Configura el cliente de la API (`ApiClient`) con las credenciales del juego.
-  - Ejecuta un bucle principal que alterna entre la pantalla de **Login** y el **Menú Principal** si el usuario está autenticado.
-
----
-
-## 2. Módulo de API (`Api´s/`)
-
-Encargado de la comunicación con el servidor backend para gestionar sesiones, partidas y rankings.
-
-### `ApiClient.h` / `ApiClient.cpp`
-Clase que maneja las peticiones HTTP (GET/POST).
-- **`probarConexion()`**: Verifica la disponibilidad del servidor y la validez de la API KEY.
-- **`loginJugador()`**: Autentica al usuario y obtiene un token de sesión (JWT) y sus datos básicos (saldo, correo).
-- **`iniciarPartida()`**: Registra el inicio de una nueva partida en el servidor y descuenta los tokens correspondientes.
-- **`reportarScore()`**: Envía el puntaje actual al servidor periódicamente durante el juego.
-- **`finalizarPartida()`**: Envía los resultados finales (score, nivel, victoria/derrota, tokens ganados) para cerrar la sesión de juego en el backend.
-- **`consultarRanking()`**: Recupera la lista de los mejores puntajes registrados para este juego.
-
-### `GameApiConfig.h`
-Espacio de nombres (`GameApiConfig`) que contiene constantes de configuración:
-- `BASE_URL`: Dirección del servidor.
-- `API_KEY` y `CODIGO_JUEGO`: Identificadores únicos del proyecto.
-- `COSTO_PARTIDA`, `PREMIOS`: Reglas de negocio del juego.
+## 1. Archivo: `main.cpp`
+Es el punto de entrada de la aplicación.
+- **Función `main()`**:
+  - Inicializa la ventana con Raylib.
+  - Configura el objeto `ApiClient` para la comunicación con el servidor.
+  - Gestiona el flujo principal: primero muestra el Login y, tras una autenticación exitosa, abre el Menú Principal.
+  - Controla el cierre limpio de la aplicación.
 
 ---
 
-## 3. Módulo de Autenticación (`auth/`)
-
-Gestiona la interfaz de acceso de los usuarios.
-
-### `Login.h` / `Login.cpp`
-- **`mostrarLogin()`**: Dibuja la interfaz de inicio de sesión (campos de texto para usuario y contraseña, botón de login). Maneja la entrada de teclado y eventos de mouse.
-- **`iniciarSesion()`**: Lógica interna que valida que los campos no estén vacíos y llama a `api.loginJugador()`.
-- **`estaAutenticado()`**: Verifica si existe una sesión activa.
-- **`cerrarSesion()`**: Limpia los datos del usuario y el token.
+## 2. Módulo de Login (`auth/Login.h` y `auth/Login.cpp`)
+Encargado de la gestión de acceso de usuarios.
+- **`mostrarLogin()`**: Ejecuta el bucle de la interfaz de login. Dibuja los cuadros de texto, el botón de visibilidad de contraseña y el botón de ingreso. Gestiona los eventos de teclado para escribir el usuario y la contraseña.
+- **`iniciarSesion()`**: Valida que los campos no estén vacíos y utiliza el `ApiClient` para verificar las credenciales en el servidor.
+- **`estaAutenticado()`**: Devuelve el estado actual de la sesión.
+- **`cerrarSesion()`**: Finaliza la sesión actual del usuario.
 
 ---
 
-## 4. Módulo del Menú (`src/Menu.h / Menu.cpp`)
-
-- **`mostrar()`**: Presenta el menú principal después del login. Permite al usuario:
-  - **Jugar**: Inicia el módulo `RompeBloques`.
-  - **Cerrar Sesión**: Regresa a la pantalla de login.
-
----
-
-## 5. Módulo del Juego (`src/RompeBloques.h / RompeBloques.cpp`)
-
-Contiene toda la lógica de físicas, renderizado y reglas del juego "Rompe Bloques".
-
-### Funciones Principales de Lógica
-- **`iniciarRompeBloque()`**: Función principal que contiene el bucle de juego (`while (!WindowShouldClose())`).
-- **`cargarNivel()`**: Configura la disposición de los bloques, sus colores y vidas según el nivel actual.
-- **`moverBarra()`**: Gestiona el movimiento horizontal de la plataforma mediante teclado (Flechas o A/D).
-- **`moverPelotas()`**: Maneja las colisiones de las pelotas con las paredes, la barra y los bloques. Actualiza el puntaje y detecta si una pelota sale del área de juego.
-- **`actualizarPowerUp()`**: Controla la aparición, caída y efecto de los Power-Ups al colisionar con la barra.
-- **`subirNivel()`**: Reinicia los elementos para avanzar al siguiente nivel de dificultad.
-- **`reiniciarJuego()`**: Restablece todas las variables (puntos, vidas, nivel) para una nueva partida.
-
-### Integración con la API
-- **`reportarScoreSiCorresponde()`**: Llama a la API para guardar el progreso si se ha superado un umbral de puntos.
-- **`finalizarEnHilo()`**: Ejecuta la llamada a `finalizarPartida` en un hilo secundario (`std::thread`) para evitar que el juego se congele mientras espera la respuesta del servidor.
-- **`calcularTokensPorNivel()`**: Determina cuántos tokens ha ganado el jugador basado en su desempeño.
-
-### Funciones de Renderizado (UI)
-- **`dibujarAreaJuego()`**: Dibuja los límites y marcos del juego.
-- **`dibujarPelotas()`, `dibujarBloques()`, `dibujarBarra()`, `dibujarPowerUp()`**: Funciones encargadas de pintar cada elemento en pantalla.
-- **`dibujarHUD()`**: Muestra la información de vidas, puntos y nivel actual en el lateral derecho.
-- **`dibujarPantallaFinal()`**: Muestra el mensaje de "GANASTE" o "GAME OVER" con botones para reintentar o volver al menú.
+## 3. Módulo de Menú (`src/Menu.h` y `src/Menu.cpp`)
+Interfaz de navegación después de iniciar sesión.
+- **`mostrar()`**: Dibuja el menú principal con opciones para "Jugar" y "Cerrar Sesión".
+  - Al pulsar "Jugar", llama a la función `iniciarRompeBloque`.
+  - Al pulsar "Cerrar Sesión", notifica a la API y regresa a la pantalla de Login.
 
 ---
 
-## Estructuras de Datos
-- **`Bloque`**: Almacena posición (`Rectangle`), estado, color y resistencia (vida).
-- **`Pelota`**: Almacena posición, velocidad, radio y estados especiales (como si es tipo "bomba").
-- **`PowerUp`**: Almacena posición, tipo de poder y estado de actividad.
+## 4. Módulo Rompe Bloques (`src/RompeBloques.h` y `src/RompeBloques.cpp`)
+Contiene toda la lógica del juego principal.
+
+### Funciones de Control y Lógica:
+- **`iniciarRompeBloque()`**: Función principal que orquestra el juego. Inicializa recursos, sonidos y el bucle de juego.
+- **`cargarNivel()`**: Configura la posición y resistencia de los bloques dependiendo del nivel actual.
+- **`moverBarra()`**: Controla el movimiento de la paleta del jugador.
+- **`moverPelotas()`**: Gestiona el movimiento físico de las pelotas y sus colisiones con paredes, bloques y paleta.
+- **`actualizarPowerUp()`**: Maneja la generación y aplicación de poderes especiales (pelota extra, barra grande, bomba).
+- **`subirNivel()`**: Prepara el juego para el siguiente nivel de dificultad.
+- **`reiniciarJuego()`**: Restablece el estado inicial de la partida.
+
+### Integración con API en el juego:
+- **`iniciarNuevaPartida()`**: Registra el comienzo de una sesión de juego en el servidor.
+- **`reportarScoreSiCorresponde()`**: Envía el puntaje acumulado al servidor durante la partida.
+- **`finalizarEnHilo()`**: Envía los resultados finales de la partida en un hilo separado para no afectar el rendimiento visual.
+- **`calcularTokensPorNivel()`**: Determina la recompensa en tokens según el nivel alcanzado.
+
+### Funciones de Dibujo:
+- **`dibujarHUD()`**: Muestra vidas, puntos y nivel actual.
+- **`dibujarPantallaFinal()`**: Muestra el resultado (victoria/derrota) y opciones para reintentar o salir.
+- **`dibujarBloques()`, `dibujarPelotas()`, `dibujarBarra()`**: Renderizan los elementos visuales del juego.
