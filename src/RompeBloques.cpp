@@ -8,10 +8,6 @@
 #include <string>
 #include <thread>
 
-// ===========================
-// CONSTANTES
-// ===========================
-
 const int intTiempoPower       = 7;
 const int intTiempoBarraGrande = 4;
 const int filas                = 4;
@@ -169,10 +165,6 @@ bool botonReiniciar(int x, int y, int ancho, int alto, const char* texto)
     return hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 }
 
-// ===========================
-// FUNCION: dibujarPantallaFinal
-// Retorna: 1 = volver a jugar, 2 = volver al menu, 0 = nada
-// ===========================
 
 int dibujarPantallaFinal(bool gano)
 {
@@ -181,10 +173,8 @@ int dibujarPantallaFinal(bool gano)
     int cx = juegoX + juegoAncho / 2;
     int cy = juegoY + juegoAlto  / 2;
 
-    // Overlay semitransparente
     DrawRectangle(juegoX, juegoY, juegoAncho, juegoAlto, { 0, 0, 0, 180 });
 
-    // Cuadro central
     int cuadroAncho = 500;
     int cuadroAlto  = 300;
     int cuadroX     = cx - cuadroAncho / 2;
@@ -199,22 +189,19 @@ int dibujarPantallaFinal(bool gano)
         { (float)cuadroX, (float)cuadroY, (float)cuadroAncho, (float)cuadroAlto },
         0.15f, 8, 3.0f, colorBorde);
 
-    // Titulo
-    const char* titulo    = gano ? "GANASTE!" : "GAME OVER";
-    Color colorTitulo     = gano ? GREEN : RED;
-    int   tamTitulo       = 60;
-    int   anchoTitulo     = MeasureText(titulo, tamTitulo);
+    const char* titulo = gano ? "GANASTE!" : "GAME OVER";
+    Color colorTitulo  = gano ? GREEN : RED;
+    int   tamTitulo    = 60;
+    int   anchoTitulo  = MeasureText(titulo, tamTitulo);
 
     DrawText(titulo, cx - anchoTitulo / 2, cuadroY + 40, tamTitulo, colorTitulo);
 
-    // Linea separadora
     DrawLine(cuadroX + 30, cuadroY + 120,
              cuadroX + cuadroAncho - 30, cuadroY + 120,
              { 80, 80, 80, 255 });
 
     Vector2 mouse = GetMousePosition();
 
-    // BOTON: Volver a jugar
     int btnAncho = 200;
     int btnAlto  = 50;
     int btn1X    = cx - btnAncho - 20;
@@ -222,35 +209,26 @@ int dibujarPantallaFinal(bool gano)
 
     Rectangle boton1 = { (float)btn1X, (float)btn1Y, (float)btnAncho, (float)btnAlto };
     bool hover1      = CheckCollisionPointRec(mouse, boton1);
-
-    Color colorBtn1 = hover1 ? GREEN : Color{ 0, 150, 0, 255 };
+    Color colorBtn1  = hover1 ? GREEN : Color{ 0, 150, 0, 255 };
     DrawRectangleRounded(boton1, 0.3f, 6, colorBtn1);
     DrawRectangleRoundedLinesEx(boton1, 0.3f, 6, 2.0f, WHITE);
-
-    const char* txtBtn1   = "Volver a jugar";
-    int         anchoBtn1 = MeasureText(txtBtn1, 18);
+    const char* txtBtn1  = "Volver a jugar";
+    int anchoBtn1        = MeasureText(txtBtn1, 18);
     DrawText(txtBtn1, btn1X + (btnAncho - anchoBtn1) / 2, btn1Y + 16, 18, WHITE);
+    if (hover1 && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) resultado = 1;
 
-    if (hover1 && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-        resultado = 1;
-
-    // BOTON: Volver al menu
     int btn2X = cx + 20;
     int btn2Y = cuadroY + 160;
 
     Rectangle boton2 = { (float)btn2X, (float)btn2Y, (float)btnAncho, (float)btnAlto };
     bool hover2      = CheckCollisionPointRec(mouse, boton2);
-
-    Color colorBtn2 = hover2 ? SKYBLUE : Color{ 0, 100, 180, 255 };
+    Color colorBtn2  = hover2 ? SKYBLUE : Color{ 0, 100, 180, 255 };
     DrawRectangleRounded(boton2, 0.3f, 6, colorBtn2);
     DrawRectangleRoundedLinesEx(boton2, 0.3f, 6, 2.0f, WHITE);
-
-    const char* txtBtn2   = "Volver al Menu";
-    int         anchoBtn2 = MeasureText(txtBtn2, 18);
+    const char* txtBtn2  = "Volver al Menu";
+    int anchoBtn2        = MeasureText(txtBtn2, 18);
     DrawText(txtBtn2, btn2X + (btnAncho - anchoBtn2) / 2, btn2Y + 16, 18, WHITE);
-
-    if (hover2 && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-        resultado = 2;
+    if (hover2 && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) resultado = 2;
 
     return resultado;
 }
@@ -262,10 +240,10 @@ int dibujarPantallaFinal(bool gano)
 void moverBarra(Rectangle& barra)
 {
     if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))
-        barra.x -= 7.0f;
+        barra.x -= 7.8f;
 
     if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
-        barra.x += 7.0f;
+        barra.x += 7.8f;
 
     if (barra.x < juegoX)
         barra.x = juegoX;
@@ -333,6 +311,11 @@ void dibujarPowerUp(PowerUp power)
 {
     if (!power.activo) return;
 
+    //amarillo: pelota extra
+    //verde: doble
+    //red: pelota bomba
+    //amarillo: pelota extra
+
     Color c = YELLOW;
     if (power.tipo == 1) c = GREEN;
     if (power.tipo == 2) c = RED;
@@ -362,27 +345,26 @@ void dibujarHUD(int puntos, int vidas, int nivel)
 // POWER UPS
 // ===========================
 
-void aplicarPowerBolaExtra(Pelota pelotas[], int maxPelotas, Rectangle barra)
+void aplicarPowerBolaExtra(Pelota pelotas[], int maxPelotas, Rectangle barra, float velocidadActual)
 {
     for (int i = 0; i < maxPelotas; i++)
         if (!pelotas[i].activa)
         {
             pelotas[i] = {{ barra.x + barra.width / 2, barra.y - 10 },
-                          { -4.0f, -4.0f }, 8.0f, true, false};
+                          { -velocidadActual, -velocidadActual }, 8.0f, true, false};
             break;
         }
 }
 
-void aplicarPowerDobleBola(Pelota pelotas[], int maxPelotas, Rectangle barra)
+void aplicarPowerDobleBola(Pelota pelotas[], int maxPelotas, Rectangle barra, float velocidadActual)
 {
     for (int k = 0; k < 2; k++)
         for (int i = 0; i < maxPelotas; i++)
             if (!pelotas[i].activa)
             {
-                float vx = (float)((rand() % 5) - 2);
-                if (vx == 0) vx = 2.0f;
+                float vx = (rand() % 2 == 0) ? velocidadActual : -velocidadActual;
                 pelotas[i] = {{ barra.x + barra.width / 2, barra.y - 10 },
-                               { vx, -4.0f }, 8.0f, true, false};
+                               { vx, -velocidadActual }, 8.0f, true, false};
                 break;
             }
 }
@@ -398,7 +380,8 @@ void aplicarPowerBarraGrande(Rectangle& barra, bool& barraGrandeActiva, double& 
 
 void actualizarPowerUp(
     PowerUp& power, Rectangle& barra, Pelota pelotas[], int maxPelotas,
-    bool& barraGrandeActiva, double& tiempoBarraGrande, double& ultimoPower)
+    bool& barraGrandeActiva, double& tiempoBarraGrande, double& ultimoPower,
+    float velocidadActual)
 {
     if (GetTime() - ultimoPower > intTiempoPower)
     {
@@ -419,8 +402,8 @@ void actualizarPowerUp(
 
     if (power.activo && CheckCollisionRecs(power.rect, barra))
     {
-        if (power.tipo == 0) aplicarPowerBolaExtra(pelotas, maxPelotas, barra);
-        if (power.tipo == 1) aplicarPowerDobleBola(pelotas, maxPelotas, barra);
+        if (power.tipo == 0) aplicarPowerBolaExtra(pelotas, maxPelotas, barra, velocidadActual);
+        if (power.tipo == 1) aplicarPowerDobleBola(pelotas, maxPelotas, barra, velocidadActual);
         if (power.tipo == 2) aplicarPowerBomba(pelotas);
         if (power.tipo == 3) aplicarPowerBarraGrande(barra, barraGrandeActiva, tiempoBarraGrande);
         power.activo = false;
@@ -514,32 +497,34 @@ void moverPelotas(
                             puntos++;
                             bloquesDestruidos++;
 
-                            //aumenta la velocidad segun los bloques destruidos
+                            // Aumentar velocidad cada 15 bloques destruidos
                             const int intPelotasDestruidos = 15;
                             if (bloquesDestruidos > 0 &&
                                 bloquesDestruidos % intPelotasDestruidos == 0)
                             {
-                                pelotas[p].vel.x *= 1.8f;
-                                pelotas[p].vel.y *= 1.8f;
+                                pelotas[p].vel.x *= 1.5f;
+                                pelotas[p].vel.y *= 1.5f;
                                 velocidadActual   = pelotas[p].vel.x;
                             }
-                        }
 
-                        if (pelotas[p].bomba)
-                        {
-                            for (int a = -1; a <= 1; a++)
-                                for (int b = -1; b <= 1; b++)
-                                {
-                                    int ni = i + a, nj = j + b;
-                                    if (ni >= 0 && ni < filas && nj >= 0 && nj < columnas)
-                                        if (bloques[ni][nj].activo)
-                                        {
-                                            bloques[ni][nj].activo = false;
-                                            puntos++;
-                                            bloquesDestruidos++;
-                                        }
-                                }
-                            pelotas[p].bomba = false;
+                            // Efecto bomba SOLO si el bloque se destruyo
+                            if (pelotas[p].bomba)
+                            {
+                                for (int a = -1; a <= 1; a++)
+                                    for (int b = -1; b <= 1; b++)
+                                    {
+                                        int ni = i + a, nj = j + b;
+                                        if (ni >= 0 && ni < filas &&
+                                            nj >= 0 && nj < columnas)
+                                            if (bloques[ni][nj].activo)
+                                            {
+                                                bloques[ni][nj].activo = false;
+                                                puntos++;
+                                                bloquesDestruidos++;
+                                            }
+                                    }
+                                pelotas[p].bomba = false;
+                            }
                         }
                         break;
                     }
@@ -712,13 +697,12 @@ bool iniciarRompeBloque(ApiClient& api)
                 bool  lanzar = false;
                 float dirX   = velocidadActual;
 
-                //lanza la pelota
                 if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A))
-                    { lanzar = true; dirX = -velocidadActual; }
+                { lanzar = true; dirX = -velocidadActual; }
                 else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
-                    { lanzar = true; dirX =  velocidadActual; }
-                else if (IsKeyPressed(KEY_W))
-                    { lanzar = true; dirX = (rand() % 2 == 0) ? velocidadActual : -velocidadActual; }
+                { lanzar = true; dirX =  velocidadActual; }
+                else if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_SPACE))
+                { lanzar = true; dirX = (rand() % 2 == 0) ? velocidadActual : -velocidadActual; }
 
                 if (lanzar)
                 {
@@ -733,8 +717,10 @@ bool iniciarRompeBloque(ApiClient& api)
                 }
             }
 
+            // Pasar velocidadActual a actualizarPowerUp para las pelotas extra
             actualizarPowerUp(power, barra, pelotas, MAX_PELOTAS,
-                              barraGrandeActiva, tiempoBarraGrande, ultimoPower);
+                              barraGrandeActiva, tiempoBarraGrande, ultimoPower,
+                              velocidadActual);
 
             if (!esperandoLanzar)
                 moverPelotas(pelotas, MAX_PELOTAS, barra, bloques,
@@ -774,7 +760,6 @@ bool iniciarRompeBloque(ApiClient& api)
                             std::chrono::seconds>(ahora - inicioPartida).count();
 
                         int tokens = calcularTokensPorNivel(nivel);
-
                         finalizarEnHilo(&api, partidaActual,
                                         puntos, nivel, "WIN", duracion, tokens);
 
