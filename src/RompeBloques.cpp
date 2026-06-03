@@ -64,10 +64,11 @@ struct PowerUp
 
 int calcularTokensPorNivel(int nivelCompletado)
 {
-    if (nivelCompletado >= GameApiConfig::SCORE_PREMIO_ALTO)
+    if (nivelCompletado >= MAX_NIVELES)
         return GameApiConfig::PREMIO_ALTO;
 
-    if (nivelCompletado >= GameApiConfig::SCORE_PREMIO_BAJO)
+    // MODIFICADO: Ahora desde el nivel 1 completado otorga PREMIO_BAJO
+    if (nivelCompletado >= 1)
         return GameApiConfig::PREMIO_BAJO;
 
     return 0;
@@ -117,11 +118,10 @@ void reportarScoreSiCorresponde(
 
 // ===========================
 // FUNCION: finalizarEnHilo
-// Hace la llamada HTTP en segundo plano para no trabar el juego
 // ===========================
 
 void finalizarEnHilo(
-    ApiClient*  api,
+    ApiClient* api,
     PartidaApi  partida,
     int         score,
     int         nivel,
@@ -152,10 +152,8 @@ bool botonReiniciar(int x, int y, int ancho, int alto, const char* texto)
     Vector2 mouse   = GetMousePosition();
     bool hover      = CheckCollisionPointRec(mouse, boton);
 
-    if (hover)
-        DrawRectangleRec(boton, DARKGRAY);
-    else
-        DrawRectangleRec(boton, GRAY);
+    if (hover) DrawRectangleRec(boton, DARKGRAY);
+    else       DrawRectangleRec(boton, GRAY);
 
     DrawRectangleLinesEx(boton, 2, WHITE);
 
@@ -165,8 +163,11 @@ bool botonReiniciar(int x, int y, int ancho, int alto, const char* texto)
     return hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 }
 
+// ===========================
+// FUNCION: dibujarPantallaFinal
+// ===========================
 
-int dibujarPantallaFinal(bool gano)
+int dibujarPantallaFinal(bool gano, int tokensGanadosPartida)
 {
     int resultado = 0;
 
@@ -176,7 +177,7 @@ int dibujarPantallaFinal(bool gano)
     DrawRectangle(juegoX, juegoY, juegoAncho, juegoAlto, { 0, 0, 0, 180 });
 
     int cuadroAncho = 500;
-    int cuadroAlto  = 300;
+    int cuadroAlto  = 340;
     int cuadroX     = cx - cuadroAncho / 2;
     int cuadroY     = cy - cuadroAlto  / 2;
 
@@ -193,11 +194,20 @@ int dibujarPantallaFinal(bool gano)
     Color colorTitulo  = gano ? GREEN : RED;
     int   tamTitulo    = 60;
     int   anchoTitulo  = MeasureText(titulo, tamTitulo);
+    DrawText(titulo, cx - anchoTitulo / 2, cuadroY + 30, tamTitulo, colorTitulo);
 
-    DrawText(titulo, cx - anchoTitulo / 2, cuadroY + 40, tamTitulo, colorTitulo);
+    DrawLine(cuadroX + 30, cuadroY + 110,
+             cuadroX + cuadroAncho - 30, cuadroY + 110,
+             { 80, 80, 80, 255 });
 
-    DrawLine(cuadroX + 30, cuadroY + 120,
-             cuadroX + cuadroAncho - 30, cuadroY + 120,
+    std::string txtTokens = "Tokens ganados: " + std::to_string(tokensGanadosPartida);
+    int anchoTokens = MeasureText(txtTokens.c_str(), 22);
+    DrawText(txtTokens.c_str(),
+             cx - anchoTokens / 2,
+             cuadroY + 125, 22, YELLOW);
+
+    DrawLine(cuadroX + 30, cuadroY + 165,
+             cuadroX + cuadroAncho - 30, cuadroY + 165,
              { 80, 80, 80, 255 });
 
     Vector2 mouse = GetMousePosition();
@@ -205,30 +215,94 @@ int dibujarPantallaFinal(bool gano)
     int btnAncho = 200;
     int btnAlto  = 50;
     int btn1X    = cx - btnAncho - 20;
-    int btn1Y    = cuadroY + 160;
+    int btn1Y    = cuadroY + 185;
 
     Rectangle boton1 = { (float)btn1X, (float)btn1Y, (float)btnAncho, (float)btnAlto };
     bool hover1      = CheckCollisionPointRec(mouse, boton1);
     Color colorBtn1  = hover1 ? GREEN : Color{ 0, 150, 0, 255 };
     DrawRectangleRounded(boton1, 0.3f, 6, colorBtn1);
     DrawRectangleRoundedLinesEx(boton1, 0.3f, 6, 2.0f, WHITE);
-    const char* txtBtn1  = "Volver a jugar";
-    int anchoBtn1        = MeasureText(txtBtn1, 18);
+    const char* txtBtn1 = "Volver a jugar";
+    int anchoBtn1       = MeasureText(txtBtn1, 18);
     DrawText(txtBtn1, btn1X + (btnAncho - anchoBtn1) / 2, btn1Y + 16, 18, WHITE);
     if (hover1 && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) resultado = 1;
 
     int btn2X = cx + 20;
-    int btn2Y = cuadroY + 160;
+    int btn2Y = cuadroY + 185;
 
     Rectangle boton2 = { (float)btn2X, (float)btn2Y, (float)btnAncho, (float)btnAlto };
     bool hover2      = CheckCollisionPointRec(mouse, boton2);
     Color colorBtn2  = hover2 ? SKYBLUE : Color{ 0, 100, 180, 255 };
     DrawRectangleRounded(boton2, 0.3f, 6, colorBtn2);
     DrawRectangleRoundedLinesEx(boton2, 0.3f, 6, 2.0f, WHITE);
-    const char* txtBtn2  = "Volver al Menu";
-    int anchoBtn2        = MeasureText(txtBtn2, 18);
+    const char* txtBtn2 = "Volver al Menu";
+    int anchoBtn2       = MeasureText(txtBtn2, 18);
     DrawText(txtBtn2, btn2X + (btnAncho - anchoBtn2) / 2, btn2Y + 16, 18, WHITE);
     if (hover2 && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) resultado = 2;
+
+    return resultado;
+}
+
+// ===========================
+// FUNCION: dibujarSinTokens
+// ===========================
+
+int dibujarSinTokens(int tokensGanadosPartida)
+{
+    int resultado = 0;
+
+    int cx = juegoX + juegoAncho / 2;
+    int cy = juegoY + juegoAlto  / 2;
+
+    DrawRectangle(juegoX, juegoY, juegoAncho, juegoAlto, { 0, 0, 0, 200 });
+
+    int cuadroAncho = 520;
+    int cuadroAlto  = 280;
+    int cuadroX     = cx - cuadroAncho / 2;
+    int cuadroY     = cy - cuadroAlto  / 2;
+
+    DrawRectangleRounded(
+        { (float)cuadroX, (float)cuadroY, (float)cuadroAncho, (float)cuadroAlto },
+        0.15f, 8, { 20, 20, 20, 240 });
+
+    DrawRectangleRoundedLinesEx(
+        { (float)cuadroX, (float)cuadroY, (float)cuadroAncho, (float)cuadroAlto },
+        0.15f, 8, 3.0f, ORANGE);
+
+    const char* titulo = "SIN TOKENS";
+    int anchoTitulo    = MeasureText(titulo, 50);
+    DrawText(titulo, cx - anchoTitulo / 2, cuadroY + 30, 50, ORANGE);
+
+    const char* msg = "No tienes tokens suficientes para jugar.";
+    int anchoMsg    = MeasureText(msg, 18);
+    DrawText(msg, cx - anchoMsg / 2, cuadroY + 100, 18, LIGHTGRAY);
+
+    std::string txtGanados = "Tokens ganados esta partida: " + std::to_string(tokensGanadosPartida);
+    int anchoGanados       = MeasureText(txtGanados.c_str(), 20);
+    DrawText(txtGanados.c_str(), cx - anchoGanados / 2, cuadroY + 135, 20, YELLOW);
+
+    std::string txtCosto = "Costo por partida: " + std::to_string(GameApiConfig::COSTO_PARTIDA);
+    int anchoCosto       = MeasureText(txtCosto.c_str(), 20);
+    DrawText(txtCosto.c_str(), cx - anchoCosto / 2, cuadroY + 165, 20, RED);
+
+    int btnAncho = 220;
+    int btnAlto  = 50;
+    int btnX     = cx - btnAncho / 2;
+    int btnY     = cuadroY + 205;
+
+    Rectangle boton = { (float)btnX, (float)btnY, (float)btnAncho, (float)btnAlto };
+    Vector2 mouse   = GetMousePosition();
+    bool hover      = CheckCollisionPointRec(mouse, boton);
+
+    Color colorBtn = hover ? SKYBLUE : Color{ 0, 100, 180, 255 };
+    DrawRectangleRounded(boton, 0.3f, 6, colorBtn);
+    DrawRectangleRoundedLinesEx(boton, 0.3f, 6, 2.0f, WHITE);
+
+    const char* txtBtn = "Volver al Menu";
+    int anchoBtn       = MeasureText(txtBtn, 18);
+    DrawText(txtBtn, btnX + (btnAncho - anchoBtn) / 2, btnY + 16, 18, WHITE);
+
+    if (hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) resultado = 2;
 
     return resultado;
 }
@@ -240,10 +314,10 @@ int dibujarPantallaFinal(bool gano)
 void moverBarra(Rectangle& barra)
 {
     if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A))
-        barra.x -= 7.8f;
+        barra.x -= 10.0f;
 
     if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))
-        barra.x += 7.8f;
+        barra.x += 10.0f;
 
     if (barra.x < juegoX)
         barra.x = juegoX;
@@ -251,10 +325,6 @@ void moverBarra(Rectangle& barra)
     if (barra.x + barra.width > juegoX + juegoAncho)
         barra.x = juegoX + juegoAncho - barra.width;
 }
-
-// ===========================
-// FUNCION: dibujarAreaJuego
-// ===========================
 
 void dibujarAreaJuego()
 {
@@ -311,11 +381,6 @@ void dibujarPowerUp(PowerUp power)
 {
     if (!power.activo) return;
 
-    //amarillo: pelota extra
-    //verde: doble
-    //red: pelota bomba
-    //amarillo: pelota extra
-
     Color c = YELLOW;
     if (power.tipo == 1) c = GREEN;
     if (power.tipo == 2) c = RED;
@@ -324,7 +389,7 @@ void dibujarPowerUp(PowerUp power)
     DrawRectangleRec(power.rect, c);
 }
 
-void dibujarHUD(int puntos, int vidas, int nivel)
+void dibujarHUD(int puntos, int vidas, int nivel, int tokensGanadosPartida)
 {
     DrawRectangleLinesEx(
         { (float)(hudX - 10), (float)(juegoY - 5),
@@ -339,6 +404,9 @@ void dibujarHUD(int puntos, int vidas, int nivel)
 
     DrawText("NIVEL",  hudX + 20, juegoY + 380, 28, LIGHTGRAY);
     DrawText(TextFormat("%i / %i", nivel, MAX_NIVELES), hudX + 20, juegoY + 420, 40, WHITE);
+
+    DrawText("TOKENS GANADOS", hudX + 20, juegoY + 560, 22, LIGHTGRAY);
+    DrawText(TextFormat("%i", tokensGanadosPartida), hudX + 20, juegoY + 600, 40, YELLOW);
 }
 
 // ===========================
@@ -456,6 +524,7 @@ void moverPelotas(
     {
         if (!pelotas[p].activa) continue;
 
+        // CORREGIDO: Ahora usa 'pelotas[p]' correctamente
         pelotas[p].pos.x += pelotas[p].vel.x;
         pelotas[p].pos.y += pelotas[p].vel.y;
 
@@ -497,7 +566,6 @@ void moverPelotas(
                             puntos++;
                             bloquesDestruidos++;
 
-                            // Aumentar velocidad cada 15 bloques destruidos
                             const int intPelotasDestruidos = 15;
                             if (bloquesDestruidos > 0 &&
                                 bloquesDestruidos % intPelotasDestruidos == 0)
@@ -507,7 +575,6 @@ void moverPelotas(
                                 velocidadActual   = pelotas[p].vel.x;
                             }
 
-                            // Efecto bomba SOLO si el bloque se destruyo
                             if (pelotas[p].bomba)
                             {
                                 for (int a = -1; a <= 1; a++)
@@ -600,7 +667,8 @@ void reiniciarJuego(
     PowerUp& power, bool& barraGrandeActiva,
     float& velocidadActual,
     bool& sonidoGanadoReproducido, bool& sonidoPerdidoReproducido,
-    int& nivel, bool& partidaFinalizada, int& ultimoScoreReportado)
+    int& nivel, bool& partidaFinalizada, int& ultimoScoreReportado,
+    int& tokensGanadosPartida, bool& premioBajoEntregado)
 {
     nivel           = 1;
     velocidadActual = velocidadPorNivel[0];
@@ -610,23 +678,23 @@ void reiniciarJuego(
     resetearPelotaYBarra(barra, pelotas, maxPelotas, esperandoLanzar);
     cargarNivel(bloques, colores, nivel);
 
-    puntos               = 0;
-    vidas                = 3;
-    bloquesDestruidos    = 0;
-    ganar                = false;
-    perder               = false;
-    power.activo         = false;
-    barraGrandeActiva    = false;
-    partidaFinalizada    = false;
-    ultimoScoreReportado = 0;
+    puntos                   = 0;
+    vidas                    = 3;
+    bloquesDestruidos        = 0;
+    ganar                    = false;
+    perder                   = false;
+    power.activo             = false;
+    barraGrandeActiva        = false;
+    partidaFinalizada        = false;
+    ultimoScoreReportado     = 0;
+    tokensGanadosPartida     = 0;
+    premioBajoEntregado      = false;
     sonidoGanadoReproducido  = false;
     sonidoPerdidoReproducido = false;
 }
 
 // ===========================
 // FUNCION PRINCIPAL
-// Retorna true si el jugador presiono "Volver al Menu"
-// Retorna false si cerro la ventana
 // ===========================
 
 bool iniciarRompeBloque(ApiClient& api)
@@ -660,7 +728,7 @@ bool iniciarRompeBloque(ApiClient& api)
     int puntos = 0, vidas = 3, bloquesDestruidos = 0;
     bool ganar = false, perder = false;
 
-    PowerUp power  = {};
+    PowerUp power      = {};
     double ultimoPower = GetTime();
     bool   barraGrandeActiva = false;
     double tiempoBarraGrande = 0;
@@ -674,7 +742,12 @@ bool iniciarRompeBloque(ApiClient& api)
     PartidaApi partidaActual;
     bool partidaIniciada      = false;
     bool partidaFinalizada    = false;
+    bool sinTokens            = false;
     int  ultimoScoreReportado = 0;
+    int  tokensGanadosPartida = 0;
+
+    bool premioBajoEntregado = false;
+
     std::chrono::steady_clock::time_point inicioPartida;
 
     bool volverAlMenu = false;
@@ -685,7 +758,7 @@ bool iniciarRompeBloque(ApiClient& api)
         // LOGICA
         // =========================
 
-        if (!ganar && !perder)
+        if (!ganar && !perder && !sinTokens)
         {
             moverBarra(barra);
 
@@ -698,11 +771,11 @@ bool iniciarRompeBloque(ApiClient& api)
                 float dirX   = velocidadActual;
 
                 if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A))
-                { lanzar = true; dirX = -velocidadActual; }
+                    { lanzar = true; dirX = -velocidadActual; }
                 else if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D))
-                { lanzar = true; dirX =  velocidadActual; }
+                    { lanzar = true; dirX =  velocidadActual; }
                 else if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_SPACE))
-                { lanzar = true; dirX = (rand() % 2 == 0) ? velocidadActual : -velocidadActual; }
+                    { lanzar = true; dirX = (rand() % 2 == 0) ? velocidadActual : -velocidadActual; }
 
                 if (lanzar)
                 {
@@ -711,13 +784,25 @@ bool iniciarRompeBloque(ApiClient& api)
 
                     if (!partidaIniciada)
                     {
-                        inicioPartida   = std::chrono::steady_clock::now();
-                        partidaIniciada = iniciarNuevaPartida(api, partidaActual);
+                        inicioPartida = std::chrono::steady_clock::now();
+                        bool ok       = iniciarNuevaPartida(api, partidaActual);
+
+                        if (!ok)
+                        {
+                            sinTokens       = true;
+                            esperandoLanzar = true;
+                            resetearPelotaYBarra(barra, pelotas, MAX_PELOTAS, esperandoLanzar);
+                        }
+                        else
+                        {
+                            partidaIniciada      = true;
+                            tokensGanadosPartida = 0;
+                            premioBajoEntregado  = false;
+                        }
                     }
                 }
             }
 
-            // Pasar velocidadActual a actualizarPowerUp para las pelotas extra
             actualizarPowerUp(power, barra, pelotas, MAX_PELOTAS,
                               barraGrandeActiva, tiempoBarraGrande, ultimoPower,
                               velocidadActual);
@@ -730,7 +815,6 @@ bool iniciarRompeBloque(ApiClient& api)
                 reportarScoreSiCorresponde(api, partidaActual,
                                            puntos, nivel, ultimoScoreReportado);
 
-            // Verificar pelotas caidas
             bool algunaPelotaActiva = false;
             for (int i = 0; i < MAX_PELOTAS; i++)
                 if (pelotas[i].activa) { algunaPelotaActiva = true; break; }
@@ -749,23 +833,19 @@ bool iniciarRompeBloque(ApiClient& api)
             {
                 if (nivel >= MAX_NIVELES)
                 {
+                    if (partidaIniciada && !ganar)
+                    {
+                        tokensGanadosPartida += GameApiConfig::PREMIO_ALTO;
+                    }
                     ganar = true;
                 }
                 else
                 {
-                    if (partidaIniciada && !partidaFinalizada && nivel == 2)
+                    // MODIFICADO: Suma PREMIO_BAJO tanto al completar Nivel 1 como Nivel 2
+                    if (partidaIniciada)
                     {
-                        auto ahora   = std::chrono::steady_clock::now();
-                        int duracion = (int)std::chrono::duration_cast<
-                            std::chrono::seconds>(ahora - inicioPartida).count();
-
-                        int tokens = calcularTokensPorNivel(nivel);
-                        finalizarEnHilo(&api, partidaActual,
-                                        puntos, nivel, "WIN", duracion, tokens);
-
-                        inicioPartida        = std::chrono::steady_clock::now();
-                        ultimoScoreReportado = 0;
-                        partidaIniciada      = iniciarNuevaPartida(api, partidaActual);
+                        tokensGanadosPartida += GameApiConfig::PREMIO_BAJO;
+                        premioBajoEntregado   = true;
                     }
 
                     subirNivel(barra, pelotas, MAX_PELOTAS, bloques, colores,
@@ -781,8 +861,9 @@ bool iniciarRompeBloque(ApiClient& api)
                 int duracion = (int)std::chrono::duration_cast<
                     std::chrono::seconds>(ahora - inicioPartida).count();
 
+                // MODIFICADO: Enviamos tokensGanadosPartida para conservar lo acumulado al perder
                 finalizarEnHilo(&api, partidaActual,
-                                puntos, nivel, "LOSE", duracion, 0);
+                                puntos, nivel, "LOSE", duracion, tokensGanadosPartida);
                 partidaFinalizada = true;
             }
         }
@@ -799,9 +880,18 @@ bool iniciarRompeBloque(ApiClient& api)
         dibujarPelotas(pelotas, MAX_PELOTAS);
         dibujarBloques(bloques);
         dibujarPowerUp(power);
-        dibujarHUD(puntos, vidas, nivel);
+        dibujarHUD(puntos, vidas, nivel, tokensGanadosPartida);
 
-        // PANTALLA GANAR
+        if (sinTokens)
+        {
+            int accion = dibujarSinTokens(tokensGanadosPartida);
+            if (accion == 2)
+            {
+                volverAlMenu = true;
+                break;
+            }
+        }
+
         if (ganar)
         {
             if (partidaIniciada && !partidaFinalizada)
@@ -810,9 +900,8 @@ bool iniciarRompeBloque(ApiClient& api)
                 int duracion = (int)std::chrono::duration_cast<
                     std::chrono::seconds>(ahora - inicioPartida).count();
 
-                int tokens = calcularTokensPorNivel(MAX_NIVELES);
                 finalizarEnHilo(&api, partidaActual,
-                                puntos, nivel, "WIN", duracion, tokens);
+                                puntos, nivel, "WIN", duracion, tokensGanadosPartida);
                 partidaFinalizada = true;
             }
 
@@ -822,7 +911,7 @@ bool iniciarRompeBloque(ApiClient& api)
                 sonidoGanadoReproducido = true;
             }
 
-            int accion = dibujarPantallaFinal(true);
+            int accion = dibujarPantallaFinal(true, tokensGanadosPartida);
 
             if (accion == 1)
             {
@@ -831,8 +920,10 @@ bool iniciarRompeBloque(ApiClient& api)
                                ganar, perder, esperandoLanzar,
                                power, barraGrandeActiva, velocidadActual,
                                sonidoGanadoReproducido, sonidoPerdidoReproducido,
-                               nivel, partidaFinalizada, ultimoScoreReportado);
+                               nivel, partidaFinalizada, ultimoScoreReportado,
+                               tokensGanadosPartida, premioBajoEntregado);
                 partidaIniciada = false;
+                sinTokens       = false;
             }
             else if (accion == 2)
             {
@@ -841,7 +932,6 @@ bool iniciarRompeBloque(ApiClient& api)
             }
         }
 
-        // PANTALLA PERDER
         if (perder)
         {
             if (!sonidoPerdidoReproducido)
@@ -850,7 +940,7 @@ bool iniciarRompeBloque(ApiClient& api)
                 sonidoPerdidoReproducido = true;
             }
 
-            int accion = dibujarPantallaFinal(false);
+            int accion = dibujarPantallaFinal(false, tokensGanadosPartida);
 
             if (accion == 1)
             {
@@ -859,8 +949,10 @@ bool iniciarRompeBloque(ApiClient& api)
                                ganar, perder, esperandoLanzar,
                                power, barraGrandeActiva, velocidadActual,
                                sonidoGanadoReproducido, sonidoPerdidoReproducido,
-                               nivel, partidaFinalizada, ultimoScoreReportado);
+                               nivel, partidaFinalizada, ultimoScoreReportado,
+                               tokensGanadosPartida, premioBajoEntregado);
                 partidaIniciada = false;
+                sinTokens       = false;
             }
             else if (accion == 2)
             {

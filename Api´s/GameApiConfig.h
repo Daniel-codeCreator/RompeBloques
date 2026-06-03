@@ -29,7 +29,7 @@ namespace GameApiConfig { // Agrupa toda la configuración del juego en un solo 
     // COSTO DE PARTIDA
     // =========================
 
-    const int COSTO_PARTIDA = 15; 
+    const int COSTO_PARTIDA = 20;
     // Cantidad de tokens que se le descuentan al usuario cuando inicia una partida.
     // Cada grupo puede cambiar este valor.
     // El backend actualmente acepta de 0 a 1000.
@@ -44,10 +44,10 @@ namespace GameApiConfig { // Agrupa toda la configuración del juego en un solo 
     const int SCORE_PREMIO_ALTO = 3;
     // Puntaje mínimo para que el usuario gane el premio alto.
 
-    const int PREMIO_BAJO = 10; 
+    const int PREMIO_BAJO = 15;
     // Tokens que gana el usuario si alcanza SCORE_PREMIO_BAJO.
 
-    const int PREMIO_ALTO = 25;
+    const int PREMIO_ALTO = 20;
     // Tokens que gana el usuario si alcanza SCORE_PREMIO_ALTO.
 
     // =========================
